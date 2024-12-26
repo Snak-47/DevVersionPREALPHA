@@ -1,0 +1,174 @@
+const dot = document.getElementById('dot');
+const gameWorld = document.getElementById('game-world');
+let speed = 2.12135;
+
+let dotX = 0;
+let dotY = 0;
+let segmentSize = 40;
+
+let mouseX = 0;
+let mouseY = 0;
+
+const mapWidth = 3000;
+const mapHeight = 3000;
+
+let viewportWidth = window.innerWidth;
+let viewportHeight = window.innerHeight;
+
+let redDots = [];
+let dotSegments = [{ x: dotX, y: dotY }];
+let turrets = []; // Store turret elements
+
+document.addEventListener('mousemove', (e) => {
+    const gameWorldRect = gameWorld.getBoundingClientRect();
+    mouseX = e.clientX - gameWorldRect.left;
+    mouseY = e.clientY - gameWorldRect.top;
+});
+
+function spawnRedDot() {
+    const redDot = document.createElement('div');
+    redDot.classList.add('red-dot');
+
+    const randomX = Math.random() * mapWidth;
+    const randomY = Math.random() * mapHeight;
+
+    redDot.style.left = `${randomX - redDot.offsetWidth / 2}px`;
+    redDot.style.top = `${randomY - redDot.offsetHeight / 2}px`;
+
+    gameWorld.appendChild(redDot);
+
+    redDots.push({ x: randomX, y: randomY, element: redDot });
+}
+
+function checkCollisions() {
+    const counterElement = document.getElementById("counter");
+    let pickUpCount = parseInt(counterElement.innerText) || 0;
+
+    for (let i = 0; i < redDots.length; i++) {
+        const redDot = redDots[i];
+        const redDotRect = redDot.element.getBoundingClientRect();
+        const blueDotRect = dot.getBoundingClientRect();
+
+        if (
+            blueDotRect.left < redDotRect.right &&
+            blueDotRect.right > redDotRect.left &&
+            blueDotRect.top < redDotRect.bottom &&
+            blueDotRect.bottom > redDotRect.top
+        ) {
+            dotSegments.push({ x: dotX, y: dotY });
+            createNewSegment(dotSegments.length - 1);
+            createTurret(dotSegments.length - 1); // Create a turret for the new segment
+
+            redDot.element.remove();
+            redDots.splice(i, 1);
+            i--;
+
+            pickUpCount++;
+            counterElement.innerText = pickUpCount;
+        }
+    }
+}
+
+function moveDot() {
+    const dx = mouseX - dotX;
+    const dy = mouseY - dotY;
+
+    const distance = Math.sqrt(dx * dx + dy * dy);
+
+    if (distance > 1) {
+        const directionX = dx / distance;
+        const directionY = dy / distance;
+
+        dotX += directionX * speed;
+        dotY += directionY * speed;
+    } else {
+        dotX = mouseX;
+        dotY = mouseY;
+    }
+
+    // Move segments
+    for (let i = dotSegments.length - 1; i > 0; i--) {
+        dotSegments[i] = { ...dotSegments[i - 1] };
+    }
+
+    dotSegments[0] = { x: dotX, y: dotY };
+
+    dot.style.left = `${dotX - segmentSize / 2}px`;
+    dot.style.top = `${dotY - segmentSize / 2}px`;
+
+    for (let i = 1; i < dotSegments.length; i++) {
+        const segment = dotSegments[i];
+        const segmentElement = document.getElementById(`segment-${i}`);
+        const turretElement = turrets[i];
+
+        if (segmentElement) {
+            segmentElement.style.left = `${segment.x - segmentSize / 2}px`;
+            segmentElement.style.top = `${segment.y - segmentSize / 2}px`;
+        }
+
+        if (turretElement) {
+            turretElement.style.left = `${segment.x - segmentSize / 2}px`;
+            turretElement.style.top = `${segment.y - segmentSize / 2 - 10}px`; // Place turret above segment
+        }
+    }
+
+    updateCameraPosition();
+}
+
+// Segment creation
+function createNewSegment(i) {
+    const segment = document.createElement('div');
+    segment.classList.add('dot-segment');
+    segment.id = `segment-${i}`;
+    segment.style.width = `${segmentSize}px`;
+    segment.style.height = `${segmentSize}px`;
+    gameWorld.appendChild(segment);
+}
+
+function createTurret(i) {
+    const turret = document.createElement('div');
+    turret.classList.add('turret');
+    turret.id = `turret-${i}`;
+    turret.style.width = '20px';
+    turret.style.height = '20px';
+    turret.style.backgroundColor = 'grey';  
+    gameWorld.appendChild(turret);
+
+    turrets.push(turret);
+}
+
+function updateCameraPosition() {
+    const cameraX = -(dotX - viewportWidth / 2);
+    const cameraY = -(dotY - viewportHeight / 2);
+
+    viewportWidth = window.innerWidth + segmentSize;
+    viewportHeight = window.innerHeight + segmentSize;
+
+    const maxX = -(mapWidth - viewportWidth);
+    const maxY = -(mapHeight - viewportHeight);
+
+    const newCameraX = Math.max(Math.min(cameraX, 0), maxX);
+    const newCameraY = Math.max(Math.min(cameraY, 0), maxY);
+
+    gameWorld.style.left = `${newCameraX}px`;
+    gameWorld.style.top = `${newCameraY}px`;
+}
+
+// Speed Boost Button
+const speedBoostBtn = document.getElementById('speed-boost-btn');
+speedBoostBtn.addEventListener('click', () => {
+    speed *= 1.015;
+    console.log('New speed:', speed);
+});
+
+function animate() {
+    moveDot();
+    checkCollisions();
+    requestAnimationFrame(animate);
+}
+
+animate();
+
+setInterval(spawnRedDot, 10); // Delete once shapes
+
+createNewSegment(0);
